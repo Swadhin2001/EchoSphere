@@ -12,10 +12,22 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { sign_up } from "@/lib/FormSchema"
-import { Link } from "react-router-dom"
-import signUp from "@/lib/appwrite/api"
+import { sign_up } from "@/lib/validation"
+import { Link, useNavigate } from "react-router-dom"
+// import signUp from "@/lib/appwrite/api"
+import { useToast } from "@/components/ui/use-toast"
+import { useCreateUserAccount, useSigninAccount } from "@/lib/react-query/queriesAndMutation"
+import { useUserContext } from "@/context/AuthContext"
+
+
+
 const SignUpForm = () => {
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const {mutateAsync: signUp, isPending: isCreatingAccount} = useCreateUserAccount();
+  const {mutateAsync: signInAccount, isPending: isLoading} = useSigninAccount();
+  const {checkAuthUser, isLoading: isUserLoading } = useUserContext();
 
   const form = useForm<z.infer<typeof sign_up>>({
     resolver: zodResolver(sign_up),
@@ -28,9 +40,40 @@ const SignUpForm = () => {
   })
 
   async function onSubmit(values: z.infer<typeof sign_up>) {
-    try {
+    try {      
       const newUser = await signUp(values);
       console.log(newUser)
+      if (!newUser){
+        return toast({
+          title: "Sign Up newUser Failed. Please try again",
+          variant: "destructive"
+        })
+      }
+
+      const session = await signInAccount ({
+        email: values.email,
+        password: values.password,
+      })
+
+      if (!session){
+        return toast({
+          title: "Sign Up session Failed. Please try again",
+          variant: "destructive"
+        })
+      }
+      const isLoggedIn = await checkAuthUser ();
+
+      if (isLoggedIn){
+        navigate ('/');
+        form.reset();
+      }
+      else {
+        return toast({
+          title: "Sign Up DB Failed. Please try again",
+          variant: "destructive"
+        }) 
+      }
+
     } 
     catch (error) {
       console.log (error);  
@@ -92,7 +135,9 @@ const SignUpForm = () => {
             </FormItem>
           )}
         />
-        <Button type="submit">Sign Up</Button>
+        <Button type="submit">{
+          (isCreatingAccount) ? "Loading..." : "Sign Up"
+        }</Button>
         <div>Already have an account? <Link to = '/sign-in'>Sign In</Link></div>
       </form>
     </Form>
