@@ -3,7 +3,7 @@ import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import {
   Form,
   FormControl,
@@ -14,21 +14,55 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { sign_in } from "@/lib/validation"
+import { toast } from "@/components/ui/use-toast"
+import { useUserContext } from "@/context/AuthContext"
+import { useSigninAccount } from "@/lib/react-query/queriesAndMutation"
 
 
 
 const SignInForm = () => {
+  const navigate = useNavigate();
 
+  const {mutateAsync:signinAccount} = useSigninAccount();
+  const {checkAuthUser} = useUserContext();
   const form = useForm<z.infer<typeof sign_in>>({
     resolver: zodResolver(sign_in),
     defaultValues: {
-      username: '',
+      email: '',
       password: '',
     },
   })
 
-  function onSubmit(values: z.infer<typeof sign_in>) {
-    console.log(values)
+  async function onSubmit(values: z.infer<typeof sign_in>) {
+    try{
+      const session = await signinAccount({
+        email: values.email,
+        password: values.password,
+      })
+  
+      if (!session){
+        return toast({
+          title: "Sign in Failed. Please try again",
+          variant: "destructive"
+        })
+      }
+  
+      const isLoggedIn = await checkAuthUser();
+      if (!isLoggedIn){
+        return toast({
+          title: "Sign in Failed. Please try again",
+          variant: "destructive"
+        })
+      }
+      else{
+        navigate ('/');
+        form.reset();
+      }
+      console.log(values)
+    }
+    catch (e){
+      console.log (e);
+    }
   }
 
   return (
@@ -36,10 +70,10 @@ const SignInForm = () => {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <FormField
           control={form.control}
-          name="username"
+          name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Username</FormLabel>
+              <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input placeholder="Username" {...field} />
               </FormControl>
